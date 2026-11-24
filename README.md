@@ -53,3 +53,16 @@ mvn exec:java -Dexec.mainClass="sorokin.java.course.Main"
 ```
 
 Если `exec-maven-plugin` не настроен, можно запускать из IDE через класс `Main`.
+
+
+## Настройка PostgreSQL
+
+Для работы приложения необходим PostgreSQL 16.
+
+- **Host:** `localhost`
+- **Port:** `5432`
+- **Database:** `postgres`
+- **Username:** `postgres`
+- **Password:** задаётся локально в конфигурации приложения.
+
+JDBC URL: jdbc:postgresql://localhost:5432/postgres

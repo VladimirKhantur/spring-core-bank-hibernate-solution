@@ -6,8 +6,6 @@ import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 import org.springframework.stereotype.Component;
 import sorokin.java.course.user.User;
-
-import javax.management.relation.RoleInfoNotFoundException;
 import java.util.*;
 
 @Component
