@@ -1,6 +1,11 @@
 package sorokin.java.course.user;
 
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
 import org.springframework.stereotype.Component;
+import sorokin.java.course.account.Account;
+import sorokin.java.course.account.AccountProperties;
 import sorokin.java.course.account.AccountService;
 import sorokin.java.course.user.User;
 
@@ -8,48 +13,51 @@ import java.util.*;
 
 @Component
 public class UserService {
+    private final SessionFactory sessionFactory;
+    private final AccountProperties accountProperties;
 
-    private int idCounter;
-    private final Map<Integer, User> userMap;
-    private final Set<String> takenLogins;
-    private final AccountService accountService;
-
-    public UserService(AccountService accountService) {
-        this.idCounter = 0;
-        this.userMap = new HashMap<>();
-        this.takenLogins = new HashSet<>();
-        this.accountService = accountService;
+    public UserService(SessionFactory sessionFactory, AccountProperties accountProperties) {
+        this.sessionFactory = sessionFactory;
+        this.accountProperties = accountProperties;
     }
 
     public User createUser(String login) {
         String normalizedLogin = validateLogin(login);
-        if (takenLogins.contains(normalizedLogin)) {
-            throw new IllegalArgumentException("User already exists with login=%s".formatted(normalizedLogin));
+
+        try (Session session = sessionFactory.openSession()) {
+            Transaction tx = session.beginTransaction();
+
+            try {
+                if (loginExists(session, normalizedLogin)) {
+                    throw new IllegalArgumentException("User with login '%s' already exists".formatted(normalizedLogin));
+                }
+                User user = new User(normalizedLogin, new ArrayList<>());
+                session.persist(user);
+                Account account = new Account(user, accountProperties.getDefaultAmount());
+                user.addAccount(account);
+                session.persist(account);
+                tx.commit();
+                return user;
+            } catch (RuntimeException e) {
+                rollback(tx, e);
+                throw e;
+            }
         }
-
-        idCounter++;
-        var user = new User(idCounter, normalizedLogin, new ArrayList<>());
-        var defaultAccount = accountService.createAccount(user);
-        user.getAccountList().add(defaultAccount);
-
-        userMap.put(idCounter, user);
-        takenLogins.add(normalizedLogin);
-        return user;
     }
 
-    public User findUserById(Integer id) {
-        if (id == null || id <= 0) {
-            throw new IllegalArgumentException("user id must be > 0");
+    public User findUserById(Long id) {
+        try(Session session = sessionFactory.openSession()){
+            return session.find(User.class,id);
         }
-        var user = userMap.get(id);
-        if (user == null) {
-            throw new IllegalArgumentException("No such user with id=%s".formatted(id));
-        }
-        return user;
     }
 
     public List<User> findAll() {
-        return userMap.values().stream().toList();
+        try(Session session = sessionFactory.openSession()){
+            return session
+                    .createQuery("SELECT DISTINCT u from user u LEFT JOIN FETCH u.accountList", User.class)
+                    .list();
+
+        }
     }
 
     private String validateLogin(String login) {
@@ -57,5 +65,21 @@ public class UserService {
             throw new IllegalArgumentException("login must not be blank");
         }
         return login.trim();
+    }
+
+    private boolean loginExists(Session session, String login) {
+        return session.createQuery("SELECT COUNT(u) FROM user u WHERE u.login = :login", Long.class)
+                .setParameter("login", login)
+                .getSingleResult() > 0;
+    }
+
+    private void rollback(Transaction tx, RuntimeException originalException) {
+        if (tx != null && tx.isActive()) {
+            try {
+                tx.rollback();
+            } catch (RuntimeException rollbackException) {
+                originalException.addSuppressed(rollbackException);
+            }
+        }
     }
 }

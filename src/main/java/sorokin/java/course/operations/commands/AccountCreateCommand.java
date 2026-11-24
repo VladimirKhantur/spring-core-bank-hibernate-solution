@@ -12,21 +12,17 @@ import sorokin.java.course.user.UserService;
 public class AccountCreateCommand implements OperationCommand {
 
     private final AccountService accountService;
-    private final UserService userService;
     private final ConsoleInput consoleInput;
 
-    public AccountCreateCommand(AccountService accountService, UserService userService, ConsoleInput consoleInput) {
+    public AccountCreateCommand(AccountService accountService, ConsoleInput consoleInput) {
         this.accountService = accountService;
-        this.userService = userService;
         this.consoleInput = consoleInput;
     }
 
     @Override
     public void execute() {
-        int userId = consoleInput.readPositiveInt("Enter user id:", "user id");
-        var user = userService.findUserById(userId);
-        Account account = accountService.createAccount(user);
-        user.getAccountList().add(account);
+        Long userId = consoleInput.readPositiveLong("Enter user id:", "user id");
+        Account account = accountService.createAccount(userId);
         System.out.println("Account created: " + account);
     }
 
